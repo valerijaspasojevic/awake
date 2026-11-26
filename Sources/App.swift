@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let d = UserDefaults.standard
     private let tracker = AgentTracker()
+    private let keyboardLock = KeyboardLock()
     private var assertionID: IOPMAssertionID = 0
     private var level: Level = .none
     private var holds: [String: Hold] = [:]
@@ -43,12 +44,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(onCommand(_:)), name: Awake.commandNote,
                                                             object: nil, suspensionBehavior: .deliverImmediately)
+        keyboardLock.onChange = { [weak self] in self?.refreshIcon() }
         if d.bool(forKey: "jiggle") { startJiggle(prompt: false) }
         tickTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.tick() }
         tick()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        keyboardLock.unlock()
         setLevel(.none, reason: "")
         try? FileManager.default.removeItem(at: Awake.statusURL)
     }
@@ -165,8 +168,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .system: symbol = "cup.and.heat.waves.fill"
         case .display: symbol = "cup.and.saucer.fill"
         }
-        statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Awake")
-        statusItem.button?.toolTip = "Awake: " + summary
+        let locked = keyboardLock.isLocked
+        statusItem.button?.image = NSImage(systemSymbolName: locked ? "keyboard.badge.ellipsis" : symbol, accessibilityDescription: "Awake")
+            ?? NSImage(systemSymbolName: symbol, accessibilityDescription: "Awake")
+        statusItem.button?.toolTip = locked ? "Awake: keyboard locked for cleaning" : "Awake: " + summary
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -201,6 +206,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         menu.addItem(item("Jiggle Mouse", #selector(toggleJiggle), on: jiggleTimer != nil, key: "j"))
+        menu.addItem(keyboardLock.isLocked
+            ? item("Unlock Keyboard (\(KeyboardLock.format(keyboardLock.remaining)) left)", #selector(toggleKeyboardLock), on: true)
+            : item("Lock Keyboard for Cleaning (2 min)", #selector(toggleKeyboardLock)))
         menu.addItem(.separator())
         menu.addItem(item("Open at Login", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(item("Install Command Line Tool…", #selector(installCLI)))
@@ -274,6 +282,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func show(_ title: String, _ text: String) {
         let a = NSAlert(); a.messageText = title; a.informativeText = text
         NSApp.activate(ignoringOtherApps: true); a.runModal()
+    }
+
+    // MARK: Keyboard lock for cleaning (needs Accessibility permission)
+
+    @objc private func toggleKeyboardLock() {
+        if keyboardLock.isLocked { keyboardLock.unlock(); return }
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        guard AXIsProcessTrustedWithOptions(opts) else {
+            return show("Allow Accessibility", "To lock the keyboard, enable Awake in System Settings → Privacy & Security → Accessibility, then try again.\n\nIf Awake is already on there, select it, remove it with −, and add it again (macOS forgets it after an update).")
+        }
+        if !keyboardLock.lock() {
+            CGRequestListenEventAccess()
+            show("Allow Input Monitoring", "To lock the keyboard, also enable Awake in System Settings → Privacy & Security → Input Monitoring, then try again.")
+        }
     }
 
     // MARK: Mouse jiggle (keeps chat apps "Active"; needs Accessibility permission)

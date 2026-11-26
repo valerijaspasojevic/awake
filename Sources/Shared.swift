@@ -2,7 +2,7 @@
 import Foundation
 
 enum Awake {
-    static let version = "1.0.0"
+    static let version = "1.1.0"
     static let bundleID = "io.github.valerijaspasojevic.awake"
     static let commandNote = Notification.Name("io.github.valerijaspasojevic.awake.command")
     static let repoURL = URL(string: "https://github.com/valerijaspasojevic/awake")!

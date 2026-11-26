@@ -44,6 +44,7 @@ Optional, from the ☕ menu:
 | **Stay Awake While Agents Work** | Agent mode (see below). |
 | **Agent Settings** | Keep Screen On · Ignore Idle Agents · Only When Plugged In · Stop After (4–24 h or no limit) · Watched Agents · a live list of detected agents with their CPU use. |
 | **Jiggle Mouse** | When you've been idle for ~25 s, nudges the pointer 1 px and back. Needs Accessibility permission (macOS asks the first time). |
+| **Lock Keyboard for Cleaning** | Ignores every key (including media and brightness keys) for up to 2 minutes so you can wipe the keyboard. Mouse and trackpad keep working: click **Unlock Keyboard** in the floating window or the ☕ menu, or press **⌃⌥⌘U**. Needs Accessibility permission. |
 
 The ☕ icon shows what's happening:
 
